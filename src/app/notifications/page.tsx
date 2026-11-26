@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Avatar, useWorkspace } from "@/components/app-shell";
 import { Icon } from "@/components/icons";
 import { useBoard } from "@/lib/board-store";
+import { useLanguage } from "@/lib/language";
 
 type Notice = {
   id: string;
@@ -20,6 +21,7 @@ type Notice = {
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { profile, workspaces, setWorkspaceId, setProjectId } = useWorkspace();
   const { tasks, columns, projects } = useBoard();
   const [readIds, setReadIds] = useState<string[]>([]);
@@ -45,7 +47,7 @@ export default function NotificationsPage() {
         id: comment.id,
         initials: comment.author.initials,
         color: comment.author.color,
-        title: `${comment.author.name} commented on a task`,
+        title: `${comment.author.name} ${t("commented on a task")}`,
         body: comment.body,
         context: `${task.title} · ${projects.find((project) => project.id === task.projectId)?.name ?? "Project"}`,
         time: comment.createdAt,
@@ -77,16 +79,16 @@ export default function NotificationsPage() {
           id: `deadline-${task.id}-${task.dueDate}`,
           initials: "FB",
           color: "#58d6c8",
-          title: days === 0 ? "Task is due today" : "Task is due soon",
+          title: days === 0 ? t("Task is due today") : t("Task is due soon"),
           body: task.title,
           context: `${workspaces.find((item) => item.id === task.workspaceId)?.name ?? "Workspace"} · ${projects.find((project) => project.id === task.projectId)?.name ?? "Project"}`,
-          time: days === 0 ? "Today" : `In ${days} day${days === 1 ? "" : "s"}`,
+          time: days === 0 ? t("Today") : `${t("In")} ${days} ${days === 1 ? t("day") : t("days")}`,
           workspaceId: task.workspaceId,
           projectId: task.projectId,
         };
       });
     return [...comments, ...reminders];
-  }, [tasks, columns, projects, workspaces]);
+  }, [tasks, columns, projects, workspaces, t]);
 
   const unread = notices.filter(
     (notice) => !readIds.includes(notice.id),
@@ -113,9 +115,9 @@ export default function NotificationsPage() {
           <p className="eyebrow">
             PERSONAL <span className="eyebrow-dot" /> INBOX
           </p>
-          <h1>Notifications</h1>
+            <h1>{t("Notifications")}</h1>
           <p className="page-subtitle">
-            Task comments and deadlines across all your workspaces.
+            {t("Task comments and deadlines across all your workspaces.")}
           </p>
         </div>
         <button
@@ -123,7 +125,7 @@ export default function NotificationsPage() {
           onClick={markAllRead}
           disabled={!unread}
         >
-          Mark all as read
+          {t("Mark all as read")}
         </button>
       </div>
       <div className="notification-summary">
@@ -131,8 +133,8 @@ export default function NotificationsPage() {
           <Icon name="bell" size={18} />
         </span>
         <span>
-          <strong>{unread} unread notifications</strong>
-          <small>Based on task discussions and upcoming deadlines.</small>
+            <strong>{unread} {t("unread notifications")}</strong>
+            <small>{t("Based on task discussions and upcoming deadlines.")}</small>
         </span>
       </div>
       <div className="notification-list">
@@ -153,7 +155,7 @@ export default function NotificationsPage() {
                   <p>{notice.body}</p>
                   <small>{notice.context}</small>
                   <button onClick={() => openNotice(notice)}>
-                    Open task <Icon name="arrow" size={13} />
+                    {t("Open task")} <Icon name="arrow" size={13} />
                   </button>
                 </div>
                 {isUnread && <i className="unread-dot" />}

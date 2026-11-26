@@ -6,29 +6,25 @@ import { useWorkspace } from "@/components/app-shell";
 import { PriorityBadge } from "@/components/dashboard-screen";
 import { Icon } from "@/components/icons";
 import { useBoard } from "@/lib/board-store";
-import { currentUser } from "@/lib/seed-data";
+import { useLanguage } from "@/lib/language";
 
 export default function MyTasksPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { workspaces, profile, setWorkspaceId, setProjectId } = useWorkspace();
   const { tasks, columns } = useBoard();
-  const [scope, setScope] = useState("All workspaces");
+  const [scope, setScope] = useState("all");
   const [filter, setFilter] = useState("Upcoming");
   const personalTasks = useMemo(
     () =>
       tasks.filter((task) => {
-        const assignedToUser =
-          task.assignee?.id === profile.id ||
-          (profile.id !== currentUser.id &&
-            task.assignee?.id === currentUser.id);
+        const assignedToUser = task.assignee?.id === profile.id;
         return (
           assignedToUser &&
-          (scope === "All workspaces" ||
-            workspaces.find((space) => space.id === task.workspaceId)?.name ===
-              scope)
+          (scope === "all" || task.workspaceId === scope)
         );
       }),
-    [tasks, scope, profile.id, workspaces],
+    [tasks, scope, profile.id],
   );
   const isDone = (taskId: string) =>
     columns.find((column) => column.id === taskId)?.title.toLowerCase() ===
@@ -52,11 +48,11 @@ export default function MyTasksPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">
-            PERSONAL OVERVIEW <span className="eyebrow-dot" /> ALL WORKSPACES
+            {t("PERSONAL OVERVIEW")} <span className="eyebrow-dot" /> {t("ALL WORKSPACES")}
           </p>
-          <h1>My tasks</h1>
+          <h1>{t("My Tasks")}</h1>
           <p className="page-subtitle">
-            Your workload across every workspace, in one place.
+            {t("Your workload across every workspace, in one place.")}
           </p>
         </div>
         <button
@@ -64,22 +60,22 @@ export default function MyTasksPage() {
           className="button button-primary"
           onClick={() => router.push("/board")}
         >
-          <Icon name="plus" size={15} /> New task
+          <Icon name="plus" size={15} /> {t("New task")}
         </button>
       </div>
       <div className="my-task-summary">
         <div>
-          <span>Assigned to you</span>
+          <span>{t("Assigned to you")}</span>
           <strong>{personalTasks.length}</strong>
         </div>
         <div>
-          <span>Upcoming</span>
+          <span>{t("Upcoming")}</span>
           <strong>
             {personalTasks.filter((task) => !isDone(task.columnId)).length}
           </strong>
         </div>
         <div>
-          <span>Completed</span>
+          <span>{t("Completed")}</span>
           <strong>
             {personalTasks.filter((task) => isDone(task.columnId)).length}
           </strong>
@@ -95,7 +91,7 @@ export default function MyTasksPage() {
               aria-selected={filter === name}
               onClick={() => setFilter(name)}
             >
-              {name}
+              {t(name)}
             </button>
           ))}
         </div>
@@ -103,21 +99,21 @@ export default function MyTasksPage() {
           className="filter-select workspace-filter"
           value={scope}
           onChange={(event) => setScope(event.target.value)}
-          aria-label="Filter workspace"
+          aria-label={t("Filter workspace")}
         >
-          <option>All workspaces</option>
+          <option value="all">{t("All workspaces")}</option>
           {workspaces.map((space) => (
-            <option key={space.id}>{space.name}</option>
+            <option key={space.id} value={space.id}>{t(space.name)}</option>
           ))}
         </select>
       </div>
       <div className="panel my-task-list">
         <div className="my-task-list-heading">
-          <strong>Task</strong>
-          <span>Workspace</span>
-          <span>Status</span>
-          <span>Priority</span>
-          <span>Due date</span>
+          <strong>{t("Task")}</strong>
+          <span>{t("Workspace")}</span>
+          <span>{t("Status")}</span>
+          <span>{t("Priority")}</span>
+          <span>{t("Due date")}</span>
         </div>
         {visibleTasks.length ? (
           visibleTasks.map((task) => {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { RouteFrame } from "@/components/route-frame";
 import { BoardProvider } from "@/lib/board-store";
+import { LanguageProvider } from "@/lib/language";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,9 +15,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <BoardProvider>
-          <RouteFrame>{children}</RouteFrame>
-        </BoardProvider>
+        <LanguageProvider>
+          <BoardProvider>
+            <RouteFrame>{children}</RouteFrame>
+          </BoardProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

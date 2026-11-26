@@ -5,6 +5,7 @@ import { Avatar, useWorkspace } from "@/components/app-shell";
 import { Icon } from "@/components/icons";
 import { currentUser } from "@/lib/seed-data";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/lib/language";
 
 type Preferences = { email: boolean; mentions: boolean; dueDates: boolean };
 const defaultPreferences: Preferences = {
@@ -15,37 +16,16 @@ const defaultPreferences: Preferences = {
 
 export default function SettingsPage() {
   const { workspace } = useWorkspace();
-  const [name, setName] = useState(currentUser.name);
-  const [email, setEmail] = useState("jordan@northstar.studio");
+  const { t, language, setLanguage } = useLanguage();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [preferences, setPreferences] = useState(defaultPreferences);
 
   useEffect(() => {
     const supabase = createClient();
-    if (!supabase) {
-      const profile = window.localStorage.getItem("flowboard.demo.profile.v1");
-      const storedPrefs = window.localStorage.getItem(
-        "flowboard.demo.preferences.v1",
-      );
-      if (profile) {
-        try {
-          const parsed = JSON.parse(profile);
-          setName(parsed.name);
-          setEmail(parsed.email);
-        } catch {
-          window.localStorage.removeItem("flowboard.demo.profile.v1");
-        }
-      }
-      if (storedPrefs) {
-        try {
-          setPreferences({ ...defaultPreferences, ...JSON.parse(storedPrefs) });
-        } catch {
-          window.localStorage.removeItem("flowboard.demo.preferences.v1");
-        }
-      }
-      return;
-    }
+    if (!supabase) return;
     void (async () => {
       const { data } = await supabase.auth.getUser();
       const user = data.user;
@@ -73,7 +53,12 @@ export default function SettingsPage() {
     event.preventDefault();
     setError("");
     const supabase = createClient();
-    if (supabase) {
+    if (!supabase) return;
+    if (!name.trim()) {
+      setError(t("Enter your name."));
+      return;
+    }
+    {
       const { error: updateError } = await supabase.auth.updateUser({
         email,
         data: { full_name: name.trim() },
@@ -88,15 +73,6 @@ export default function SettingsPage() {
           `flowboard.preferences.v1:${data.user.id}`,
           JSON.stringify(preferences),
         );
-    } else {
-      window.localStorage.setItem(
-        "flowboard.demo.profile.v1",
-        JSON.stringify({ name: name.trim(), email }),
-      );
-      window.localStorage.setItem(
-        "flowboard.demo.preferences.v1",
-        JSON.stringify(preferences),
-      );
     }
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2200);
@@ -106,13 +82,7 @@ export default function SettingsPage() {
     const next = { ...preferences, [key]: checked };
     setPreferences(next);
     const supabase = createClient();
-    if (!supabase) {
-      window.localStorage.setItem(
-        "flowboard.demo.preferences.v1",
-        JSON.stringify(next),
-      );
-      return;
-    }
+    if (!supabase) return;
     void (async () => {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
@@ -129,33 +99,32 @@ export default function SettingsPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">
-            PREFERENCES <span className="eyebrow-dot" />{" "}
-            {workspace.name.toUpperCase()}
+            {t("PREFERENCES")} <span className="eyebrow-dot" /> {t(workspace.name).toUpperCase()}
           </p>
-          <h1>Settings</h1>
+          <h1>{t("Settings")}</h1>
           <p className="page-subtitle">
-            Make Flowboard feel like your workspace.
+            {t("Make Flowboard feel like your workspace.")}
           </p>
         </div>
       </div>
       <div className="settings-layout">
         <nav className="panel settings-nav">
           <a className="selected" href="#profile">
-            <Icon name="team" size={16} /> Profile
+            <Icon name="team" size={16} /> {t("Profile")}
           </a>
           <a href="#workspace">
-            <Icon name="projects" size={16} /> Workspace
+            <Icon name="projects" size={16} /> {t("Workspace")}
           </a>
           <a href="#notifications">
-            <Icon name="bell" size={16} /> Notifications
+            <Icon name="bell" size={16} /> {t("Notifications")}
           </a>
         </nav>
         <div className="settings-content">
           <form className="panel settings-panel" id="profile" onSubmit={save}>
             <div className="settings-title">
               <div>
-                <h2>Profile</h2>
-                <p>Update the information your teammates see.</p>
+                <h2>{t("Profile")}</h2>
+                <p>{t("Update the information your teammates see.")}</p>
               </div>
               <Avatar
                 initials={name
@@ -169,7 +138,7 @@ export default function SettingsPage() {
               />
             </div>
             <label className="form-field">
-              <span>Full name</span>
+              <span>{t("Full name")}</span>
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -178,7 +147,7 @@ export default function SettingsPage() {
               />
             </label>
             <label className="form-field">
-              <span>Email address</span>
+              <span>{t("Email address")}</span>
               <input
                 type="email"
                 value={email}
@@ -188,17 +157,17 @@ export default function SettingsPage() {
             </label>
             {error && <p className="form-error">{error}</p>}
             <div className="settings-save">
-              <span>{saved ? "Changes saved" : "Profile preferences"}</span>
+              <span>{saved ? t("Changes saved") : t("Profile preferences")}</span>
               <button className="button button-primary" type="submit">
-                Save changes
+                {t("Save changes")}
               </button>
             </div>
           </form>
           <section className="panel settings-panel" id="workspace">
             <div className="settings-title">
               <div>
-                <h2>Workspace</h2>
-                <p>Basic information about the selected workspace.</p>
+                <h2>{t("Workspace")}</h2>
+                <p>{t("Basic information about the selected workspace.")}</p>
               </div>
             </div>
             <div className="workspace-setting">
@@ -206,17 +175,21 @@ export default function SettingsPage() {
                 {workspace.initials.slice(0, 1)}
               </span>
               <span>
-                <strong>{workspace.name}</strong>
-                <small>{workspace.kind}</small>
+                <strong>{t(workspace.name)}</strong>
+                <small>{t(workspace.kind)}</small>
               </span>
-              <span className="role-chip owner">Owner</span>
+              <span className="role-chip owner">{t("Owner")}</span>
             </div>
+          </section>
+          <section className="panel settings-panel" id="language">
+            <div className="settings-title"><div><h2>{t("Language")}</h2><p>{t("Choose the language for Flowboard.")}</p></div></div>
+            <label className="form-field"><span>{t("Language")}</span><select value={language} onChange={(event) => setLanguage(event.target.value as "en" | "uk")}><option value="en">English</option><option value="uk">Українська</option></select></label>
           </section>
           <section className="panel settings-panel" id="notifications">
             <div className="settings-title">
               <div>
-                <h2>Notifications</h2>
-                <p>Choose the updates you want to receive.</p>
+                <h2>{t("Notifications")}</h2>
+                <p>{t("Choose the updates you want to receive.")}</p>
               </div>
             </div>
             {(
@@ -240,8 +213,8 @@ export default function SettingsPage() {
             ).map(([key, label, description]) => (
               <label className="preference-row" key={key}>
                 <span>
-                  <strong>{label}</strong>
-                  <small>{description}</small>
+                <strong>{t(label)}</strong>
+                  <small>{t(description)}</small>
                 </span>
                 <input
                   type="checkbox"

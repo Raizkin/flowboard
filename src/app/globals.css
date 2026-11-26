@@ -416,6 +416,42 @@ textarea:focus-visible {
   font-size: 10px;
   color: #8997a6;
 }
+.language-switch {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #273542;
+  border-radius: 7px;
+  background: #101923;
+}
+.auth-language {
+  width: max-content;
+  margin: 0 0 16px auto;
+}
+.chart-empty {
+  min-height: 190px;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: #8191a1;
+  text-align: center;
+  font-size: 12px;
+}
+.language-switch button {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #7f90a0;
+  padding: 4px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.language-switch button[aria-pressed="true"] {
+  color: #dffaf6;
+  background: #1c3a3b;
+}
 .system-status i,
 .live-dot {
   display: inline-block;
@@ -1160,10 +1196,16 @@ textarea:focus-visible {
   cursor: grabbing;
 }
 .task-card-top {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 6px;
+}
+.task-card-menu {
+  top: 24px;
+  right: -4px;
+  z-index: 8;
 }
 .task-project-label {
   display: flex;

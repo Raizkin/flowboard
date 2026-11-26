@@ -1,34 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Avatar, useWorkspace } from "@/components/app-shell";
 import { Icon } from "@/components/icons";
-import { currentUser, teamMembers } from "@/lib/seed-data";
+import { useBoard } from "@/lib/board-store";
+import { useLanguage } from "@/lib/language";
+import { createClient } from "@/lib/supabase/client";
 
 export default function TeamPage() {
   const { workspace, profile } = useWorkspace();
+  const { tasks } = useBoard();
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
+  const [userEmail, setUserEmail] = useState("");
   const [invited, setInvited] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const storageKey = `flowboard.invitations.v1:${profile.id}:${workspace.id}`;
-  const members = useMemo(
-    () =>
-      workspace.kind === "Personal workspace"
-        ? [profile]
-        : teamMembers.map((member) =>
-            member.id === currentUser.id ? profile : member,
-          ),
-    [profile, workspace.kind],
-  );
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(storageKey);
-    if (!stored) {
-      setInvited([]);
-      return;
-    }
+    void (async () => {
+      const supabase = createClient();
+      if (!supabase) return;
+      const { data } = await supabase.auth.getUser();
+      setUserEmail(data.user?.email ?? "");
+    })();
+  }, []);
+
+  useEffect(() => {
     try {
-      setInvited(JSON.parse(stored) as string[]);
+      const stored = window.localStorage.getItem(storageKey);
+      setInvited(stored ? (JSON.parse(stored) as string[]) : []);
     } catch {
       window.localStorage.removeItem(storageKey);
       setInvited([]);
@@ -38,59 +39,49 @@ export default function TeamPage() {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const address = email.trim().toLowerCase();
-    if (!address.includes("@")) {
-      setMessage("Enter a valid email address.");
+    if (!address.includes("@") || !address.includes(".")) {
+      setMessage(t("Enter a valid email address."));
       return;
     }
     if (invited.includes(address)) {
-      setMessage("This person has already been invited.");
+      setMessage(t("This person has already been added."));
       return;
     }
     const next = [...invited, address];
     setInvited(next);
     window.localStorage.setItem(storageKey, JSON.stringify(next));
     setEmail("");
-    setMessage("Invitation saved as pending in this workspace.");
+    setMessage(t("Email added to the local invite list. Email delivery is not connected yet."));
   }
+
+  const memberTasks = tasks.filter(
+    (task) =>
+      task.workspaceId === workspace.id && task.assignee?.id === profile.id,
+  ).length;
 
   return (
     <section className="team-screen">
       <div className="page-heading">
         <div>
           <p className="eyebrow">
-            {workspace.name.toUpperCase()} <span className="eyebrow-dot" />{" "}
-            WORKSPACE
+            {t(workspace.name).toUpperCase()} <span className="eyebrow-dot" /> {t("WORKSPACE")}
           </p>
-          <h1>Team</h1>
-          <p className="page-subtitle">
-            Keep the people and ownership behind your work visible.
-          </p>
+          <h1>{t("Team")}</h1>
+          <p className="page-subtitle">{t("Keep the people and ownership behind your work visible.")}</p>
         </div>
       </div>
       <div className="team-overview">
         <div className="panel team-count-panel">
-          <span className="team-icon">
-            <Icon name="team" size={19} />
-          </span>
-          <span>
-            <strong>{members.length + invited.length}</strong>
-            <small>Workspace members</small>
-          </span>
+          <span className="team-icon"><Icon name="team" size={19} /></span>
+          <span><strong>{1 + invited.length}</strong><small>{t("Workspace members")}</small></span>
           <div className="avatar-stack">
-            {members.slice(0, 4).map((member) => (
-              <Avatar
-                key={member.id}
-                initials={member.initials}
-                color={member.color}
-                size="sm"
-              />
-            ))}
+            <Avatar initials={profile.initials} color={profile.color} size="sm" />
           </div>
         </div>
         <div className="panel invite-panel">
           <div>
-            <h2>Invite someone</h2>
-            <p>Save a teammate invitation for this workspace.</p>
+            <h2>{t("Invite someone")}</h2>
+            <p>{t("Add an email to the invite list for this workspace.")}</p>
           </div>
           <form onSubmit={submit}>
             <label className="invite-input">
@@ -98,79 +89,43 @@ export default function TeamPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(event) => {
-                  setEmail(event.target.value);
-                  setMessage("");
-                }}
-                placeholder="name@company.com"
-                aria-label="Email address"
+                onChange={(event) => { setEmail(event.target.value); setMessage(""); }}
+                placeholder="name@example.com"
+                aria-label={t("Email address")}
                 required
               />
             </label>
             <button className="button button-primary" type="submit">
-              <Icon name="plus" size={14} /> Invite
+              <Icon name="plus" size={14} /> {t("Add email")}
             </button>
           </form>
-          {message && (
-            <span className="invite-message" role="status">
-              {message}
-            </span>
-          )}
+          <span className="invite-message" role="status">
+            {message || t("Invite emails are not sent yet. This list is saved on this device.")}
+          </span>
         </div>
       </div>
       <div className="panel team-table">
         <div className="team-table-heading">
-          <strong>People</strong>
-          <span>Role</span>
-          <span>Tasks</span>
-          <span>Status</span>
+          <strong>{t("People")}</strong><span>{t("Role")}</span><span>{t("Tasks")}</span><span>{t("Status")}</span>
         </div>
-        {members.map((member, index) => (
-          <div className="team-row" key={member.id}>
-            <div className="team-person">
-              <Avatar initials={member.initials} color={member.color} />
-              <span>
-                <strong>{member.name}</strong>
-                <small>
-                  {member.id === profile.id ? "You · " : ""}
-                  {member.name.toLowerCase().replaceAll(" ", ".")}
-                  @flowboard.demo
-                </small>
-              </span>
-            </div>
-            <span
-              className={`role-chip ${member.id === profile.id ? "owner" : ""}`}
-            >
-              {member.id === profile.id ? "Owner" : "Member"}
-            </span>
-            <span>
-              {workspace.kind === "Personal workspace"
-                ? "2"
-                : [0, 2, 3, 1, 0][index % 5]}{" "}
-              tasks
-            </span>
-            <span className="member-status">
-              <i /> Active
-            </span>
+        <div className="team-row">
+          <div className="team-person">
+            <Avatar initials={profile.initials} color={profile.color} />
+            <span><strong>{profile.name}</strong><small>{t("You")} · {userEmail}</small></span>
           </div>
-        ))}
+          <span className="role-chip owner">{t("Owner")}</span>
+          <span>{memberTasks} {t("tasks")}</span>
+          <span className="member-status"><i /> {t("Active")}</span>
+        </div>
         {invited.map((address) => (
           <div className="team-row" key={address}>
             <div className="team-person">
-              <Avatar
-                initials={address.slice(0, 1).toUpperCase()}
-                color="#8394a5"
-              />
-              <span>
-                <strong>{address.split("@")[0]}</strong>
-                <small>{address}</small>
-              </span>
+              <Avatar initials={address.slice(0, 1).toUpperCase()} color="#8394a5" />
+              <span><strong>{address.split("@")[0]}</strong><small>{address}</small></span>
             </div>
-            <span className="role-chip">Member</span>
-            <span>0 tasks</span>
-            <span className="member-status pending">
-              <i /> Pending
-            </span>
+            <span className="role-chip">{t("Member")}</span>
+            <span>0 {t("tasks")}</span>
+            <span className="member-status pending"><i /> {t("Pending")}</span>
           </div>
         ))}
       </div>

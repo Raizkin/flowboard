@@ -11,9 +11,6 @@ import {
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import {
   initialColumns,
-  initialTasks,
-  projects as initialProjects,
-  currentUser,
 } from "@/lib/seed-data";
 import type {
   BoardColumn,
@@ -60,10 +57,10 @@ const STORAGE_KEY = "flowboard.workspace.v4";
 const BoardContext = createContext<BoardStore | null>(null);
 
 export function BoardProvider({ children }: { children: React.ReactNode }) {
-  const [columns, setColumns] = useState(initialColumns);
-  const [tasks, setTasks] = useState(initialTasks);
-  const [projects, setProjects] = useState(initialProjects);
-  const [accountId, setAccountId] = useState("demo");
+  const [columns, setColumns] = useState<BoardColumn[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [accountId, setAccountId] = useState<string | null>(null);
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,19 +68,29 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) return;
     void (async () => {
       const { data } = await supabase.auth.getSession();
-      setAccountId(data.session?.user.id ?? "demo");
+      setAccountId(data.session?.user.id ?? null);
     })();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
-        setAccountId(session?.user.id ?? "demo");
+        setAccountId(session?.user.id ?? null);
       },
     );
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
+    if (!accountId) {
+      setColumns([]);
+      setTasks([]);
+      setProjects([]);
+      setLoadedAccountId(null);
+      return;
+    }
+    setColumns([]);
+    setTasks([]);
+    setProjects([]);
     const storageKey = `${STORAGE_KEY}:${accountId}`;
     try {
       const stored = window.localStorage.getItem(storageKey);
@@ -93,25 +100,43 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
           tasks?: Task[];
           projects?: Project[];
         };
-        if (parsed.columns?.length) setColumns(parsed.columns);
-        if (parsed.tasks?.length) setTasks(parsed.tasks);
-        if (parsed.projects?.length) setProjects(parsed.projects);
+        // Remove the fixed demo content that older builds saved into real accounts.
+        // User-created records use random UUIDs, so they remain untouched.
+        const tasks = (parsed.tasks ?? []).filter(
+          (task) => !/^task-(?:[1-9]|10)$/.test(task.id),
+        );
+        const projects = (parsed.projects ?? []).filter(
+          (project) => !["website", "mobile", "brand", "portfolio"].includes(project.id),
+        );
+        const columns = (parsed.columns ?? initialColumns).filter(
+          (column) =>
+            column.workspaceId !== "northstar" &&
+            !["personal-todo", "personal-progress", "personal-done"].includes(column.id),
+        );
+        setColumns(
+          columns.some((column) => column.workspaceId === "personal")
+            ? columns
+            : [...columns, ...initialColumns],
+        );
+        setTasks(tasks);
+        setProjects(projects);
       } else {
         setColumns(initialColumns);
-        setTasks(initialTasks);
-        setProjects(initialProjects);
+        setTasks([]);
+        setProjects([]);
       }
+      setLoadedAccountId(accountId);
     } catch {
       window.localStorage.removeItem(storageKey);
+      setColumns(initialColumns);
+      setTasks([]);
+      setProjects([]);
+      setLoadedAccountId(accountId);
     }
   }, [accountId]);
 
   useEffect(() => {
-    setLoadedAccountId(accountId);
-  }, [accountId, columns, tasks, projects]);
-
-  useEffect(() => {
-    if (loadedAccountId === accountId)
+    if (accountId && loadedAccountId === accountId)
       window.localStorage.setItem(
         `${STORAGE_KEY}:${accountId}`,
         JSON.stringify({ columns, tasks, projects }),
@@ -202,7 +227,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
           projects.length % 4
         ],
         dueLabel: "No deadline",
-        members: [currentUser],
+        members: [],
       };
       setProjects((current) => [...current, project]);
       return project;

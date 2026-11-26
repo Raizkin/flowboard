@@ -6,12 +6,14 @@ import { Avatar, useWorkspace } from "@/components/app-shell";
 import { Icon } from "@/components/icons";
 import { useBoard } from "@/lib/board-store";
 import { PriorityBadge } from "@/components/dashboard-screen";
+import { useLanguage } from "@/lib/language";
 
 export default function CalendarPage() {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const { workspace, setWorkspaceId, setProjectId } = useWorkspace();
   const { tasks } = useBoard();
-  const [month, setMonth] = useState(new Date("2026-11-01T12:00:00"));
+  const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12));
   const monthTasks = useMemo(
     () =>
       tasks
@@ -25,7 +27,8 @@ export default function CalendarPage() {
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
     [tasks, workspace.id, month],
   );
-  const monthLabel = month.toLocaleDateString("en-US", {
+  const locale = language === "uk" ? "uk-UA" : "en-US";
+  const monthLabel = month.toLocaleDateString(locale, {
     month: "long",
     year: "numeric",
   });
@@ -45,12 +48,11 @@ export default function CalendarPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">
-            {workspace.name.toUpperCase()} <span className="eyebrow-dot" />{" "}
-            SCHEDULE
+            {t(workspace.name).toUpperCase()} <span className="eyebrow-dot" /> {t("SCHEDULE")}
           </p>
-          <h1>Calendar</h1>
+          <h1>{t("Calendar")}</h1>
           <p className="page-subtitle">
-            Stay ahead of task deadlines and delivery dates.
+            {t("Stay ahead of task deadlines and delivery dates.")}
           </p>
         </div>
         <button
@@ -58,7 +60,7 @@ export default function CalendarPage() {
           className="button button-primary"
           onClick={() => router.push("/board")}
         >
-          <Icon name="plus" size={15} /> New task
+          <Icon name="plus" size={15} /> {t("New task")}
         </button>
       </div>
       <div className="calendar-layout">
@@ -66,19 +68,19 @@ export default function CalendarPage() {
           <div className="calendar-toolbar">
             <div>
               <h2>{monthLabel}</h2>
-              <span>{monthTasks.length} task deadlines</span>
+              <span>{monthTasks.length} {t("task deadlines")}</span>
             </div>
             <div>
               <button
                 className="icon-button"
-                aria-label="Previous month"
+                aria-label={t("Previous month")}
                 onClick={() => shiftMonth(-1)}
               >
                 ‹
               </button>
               <button
                 className="icon-button"
-                aria-label="Next month"
+                aria-label={t("Next month")}
                 onClick={() => shiftMonth(1)}
               >
                 ›
@@ -87,7 +89,7 @@ export default function CalendarPage() {
           </div>
           <div className="calendar-weekdays">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-              <span key={day}>{day}</span>
+              <span key={day}>{t(day)}</span>
             ))}
           </div>
           <div className="calendar-days">
@@ -122,7 +124,7 @@ export default function CalendarPage() {
                     const first = items[0];
                     if (first) openTask(first);
                   }}
-                  aria-label={`${date.toLocaleDateString("en-US", { month: "long", day: "numeric" })}${items.length ? `, ${items.length} task deadlines` : ""}`}
+                  aria-label={`${date.toLocaleDateString(locale, { month: "long", day: "numeric" })}${items.length ? `, ${items.length} ${t("task deadlines")}` : ""}`}
                 >
                   <span>{date.getDate()}</span>
                   {items.slice(0, 2).map((task) => (
@@ -136,7 +138,7 @@ export default function CalendarPage() {
         </div>
         <aside className="panel calendar-agenda">
           <div className="panel-title">
-            <h2>Deadlines this month</h2>
+            <h2>{t("Deadlines this month")}</h2>
             <span>{monthTasks.length}</span>
           </div>
           {monthTasks.length ? (

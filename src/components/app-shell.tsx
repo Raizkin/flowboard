@@ -17,6 +17,7 @@ import type { Assignee, Workspace, WorkspaceId } from "@/lib/types";
 import { Icon, type IconName } from "@/components/icons";
 import { useBoard } from "@/lib/board-store";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/lib/language";
 
 type WorkspaceContextValue = {
   workspace: Workspace;
@@ -72,33 +73,40 @@ export function useWorkspace() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { initializeWorkspaceColumns, projects, createProject } = useBoard();
-  const [workspaceId, setWorkspaceId] = useState<WorkspaceId>("northstar");
+  const { language, setLanguage, t } = useLanguage();
+  const { projects } = useBoard();
+  const [workspaceId, setWorkspaceId] = useState<WorkspaceId>("personal");
   const [projectId, setProjectId] = useState("website");
   const [workspaceList, setWorkspaceList] = useState(defaultWorkspaces);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [profile, setProfile] = useState<Assignee>(currentUser);
   const isDemo = profile.id === currentUser.id;
-  const accountKey = isDemo ? "demo" : profile.id;
+  const accountKey = profile.id;
   const workspace =
     workspaceList.find((item) => item.id === workspaceId) ?? workspaceList[0];
 
   useEffect(() => {
+    if (isDemo) return;
     const storageKey = `flowboard.workspaces.v1:${accountKey}`;
     try {
       const stored = window.localStorage.getItem(storageKey);
       const parsed = stored
         ? (JSON.parse(stored) as Workspace[])
         : defaultWorkspaces;
-      setWorkspaceList(parsed.length ? parsed : defaultWorkspaces);
+      const cleanWorkspaces = parsed.filter((item) => item.id !== "northstar");
+      setWorkspaceList(cleanWorkspaces.length ? cleanWorkspaces : defaultWorkspaces);
       const selected = window.localStorage.getItem(
         `flowboard.selected-workspace.v1:${accountKey}`,
       );
-      if (selected && parsed.some((item) => item.id === selected))
+      if (selected && cleanWorkspaces.some((item) => item.id === selected))
         setWorkspaceId(selected);
-      else setWorkspaceId(parsed[0]?.id ?? defaultWorkspaces[0].id);
+      else setWorkspaceId(cleanWorkspaces[0]?.id ?? defaultWorkspaces[0].id);
+      if (cleanWorkspaces.length !== parsed.length) {
+        window.localStorage.setItem(storageKey, JSON.stringify(cleanWorkspaces));
+      }
       const selectedProject = window.localStorage.getItem(
         `flowboard.selected-project.v1:${accountKey}`,
       );
@@ -108,11 +116,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setWorkspaceList(defaultWorkspaces);
       setWorkspaceId(defaultWorkspaces[0].id);
     }
-  }, [accountKey]);
+  }, [accountKey, isDemo]);
 
   useEffect(() => {
     const supabase = createClient();
-    if (!supabase) return;
+    if (!supabase) {
+      router.replace("/signup");
+      return;
+    }
+    let active = true;
     const applyProfile = (
       user: {
         id: string;
@@ -121,7 +133,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       } | null,
     ) => {
       if (!user) {
-        setProfile(currentUser);
+        setAuthReady(false);
+        router.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
         return;
       }
       const name =
@@ -135,6 +148,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         .slice(0, 2)
         .toUpperCase();
       setProfile({ id: user.id, name, initials, color: currentUser.color });
+      setAuthReady(true);
     };
     void (async () => {
       const { data } = await supabase.auth.getUser();
@@ -143,11 +157,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) =>
-        applyProfile(session?.user ?? null),
+        (_event: AuthChangeEvent, session: Session | null) => {
+          if (active) applyProfile(session?.user ?? null);
+        },
     );
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [router]);
 
   const selectProject = useCallback(
     (id: string) => {
@@ -198,23 +216,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         );
         return next;
       });
-      initializeWorkspaceColumns(id);
-      const project = createProject(
-        id,
-        `${cleanName} board`,
-        "Your team's shared project board.",
-      );
-      selectProject(project.id);
       selectWorkspace(id);
       setWorkspaceDialogOpen(false);
     },
-    [
-      accountKey,
-      initializeWorkspaceColumns,
-      createProject,
-      selectProject,
-      selectWorkspace,
-    ],
+    [accountKey, selectWorkspace],
   );
 
   const context = useMemo(
@@ -246,10 +251,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.refresh();
   }
 
+  if (!authReady) {
+    return (
+      <main className="auth-screen" aria-live="polite">
+        <p>{t("Checking your account…")}</p>
+      </main>
+    );
+  }
+
   return (
     <WorkspaceContext.Provider value={context}>
       <div className="app-frame">
-        <aside className="sidebar" aria-label="Primary navigation">
+        <aside className="sidebar" aria-label={t("Primary navigation")}>
           <Link className="brand" href="/dashboard" aria-label="Flowboard home">
             <span className="brand-mark">
               <span />
@@ -272,25 +285,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
 
           <nav className="side-nav">
-            <p className="nav-caption">WORKSPACE</p>
+            <p className="nav-caption">{t("WORKSPACE")}</p>
             {navItems
               .filter((item) => item.group === "workspace")
               .map((item) => (
-                <NavLink key={item.href} {...item} pathname={pathname} />
+                <NavLink key={item.href} {...item} label={t(item.label)} pathname={pathname} />
               ))}
             <div className="nav-divider" />
-            <p className="nav-caption">PERSONAL</p>
+            <p className="nav-caption">{t("PERSONAL")}</p>
             {navItems
               .filter((item) => item.group === "personal")
               .map((item) => (
-                <NavLink key={item.href} {...item} pathname={pathname} />
+                <NavLink key={item.href} {...item} label={t(item.label)} pathname={pathname} />
               ))}
           </nav>
 
           <div className="sidebar-projects">
             <div className="sidebar-section-title">
-              <span>PROJECTS</span>
-              <Link href="/projects" aria-label="Browse projects">
+              <span>{t("PROJECTS")}</span>
+              <Link href="/projects" aria-label={t("Browse projects")}>
                 <Icon name="plus" size={14} />
               </Link>
             </div>
@@ -319,34 +332,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Icon name="spark" size={16} />
               </span>
               <span>
-                <strong>Need a hand?</strong>
-                <small>Open workspace tools</small>
+                <strong>{t("Need a hand?")}</strong>
+                <small>{t("Open workspace tools")}</small>
               </span>
               <Icon name="arrow" size={15} />
             </Link>
-            {isDemo ? (
-              <Link href="/login" className="user-profile">
-                <Avatar initials={profile.initials} color={profile.color} />
-                <span>
-                  <strong>{profile.name}</strong>
-                  <small>Demo · Sign in to save account data</small>
-                </span>
-                <Icon name="arrow" size={15} />
-              </Link>
-            ) : (
-              <button
-                className="user-profile"
-                onClick={signOut}
-                aria-label="Sign out"
-              >
-                <Avatar initials={profile.initials} color={profile.color} />
-                <span>
-                  <strong>{profile.name}</strong>
-                  <small>Account · Sign out</small>
-                </span>
-                <Icon name="logout" size={16} />
-              </button>
-            )}
+            <button className="user-profile" onClick={signOut} aria-label={t("Sign out")}>
+              <Avatar initials={profile.initials} color={profile.color} />
+              <span><strong>{profile.name}</strong><small>{t("Account · Sign out")}</small></span>
+              <Icon name="logout" size={16} />
+            </button>
           </div>
         </aside>
 
@@ -377,21 +372,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               className="global-search"
               onClick={() => setSearchOpen(true)}
-              aria-label="Search"
+              aria-label={t("Search")}
             >
               <Icon name="search" size={17} />
-              <span>Search anything...</span>
+              <span>{t("Search anything...")}</span>
               <kbd>⌘ K</kbd>
             </button>
             <div className="topbar-actions">
+              <div className="language-switch" role="group" aria-label={t("Language")}>
+                <button type="button" aria-pressed={language === "en"} onClick={() => setLanguage("en")}>EN</button>
+                <button type="button" aria-pressed={language === "uk"} onClick={() => setLanguage("uk")}>УКР</button>
+              </div>
               <span className="system-status">
                 <i />
-                All systems normal
+                {t("All systems normal")}
               </span>
               <Link
                 className="icon-button notification-button"
                 href="/notifications"
-                aria-label="Notifications"
+                aria-label={t("Notifications")}
               >
                 <Icon name="bell" size={18} />
                 <span className="notification-dot" />
@@ -400,7 +399,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <main className="page-content">{children}</main>
-          <nav className="mobile-nav" aria-label="Mobile navigation">
+          <nav className="mobile-nav" aria-label={t("Mobile navigation")}>
             {[
               { href: "/dashboard", label: "Home", icon: "dashboard" as const },
               { href: "/board", label: "Board", icon: "projects" as const },
@@ -413,7 +412,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className={`mobile-nav-item ${pathname === item.href ? "active" : ""}`}
               >
                 <Icon name={item.icon} size={20} />
-                <span>{item.label}</span>
+                <span>{t(item.label)}</span>
               </Link>
             ))}
           </nav>
@@ -447,6 +446,7 @@ function WorkspaceSwitcher({
   onCreate: () => void;
   compact?: boolean;
 }) {
+  const { t } = useLanguage();
   return (
     <div
       className={`workspace-switcher-wrap ${compact ? "mobile-workspace-wrap" : ""}`}
@@ -455,15 +455,15 @@ function WorkspaceSwitcher({
         className={compact ? "mobile-workspace" : "workspace-switcher"}
         onClick={onToggle}
         aria-expanded={open}
-        aria-label={`Switch workspace. Current: ${workspace.name}`}
+        aria-label={`${t("Switch workspace")}. ${t("Current")}: ${t(workspace.name)}`}
       >
         <span className={`workspace-mark workspace-mark-${workspace.id}`}>
           {workspace.initials.slice(0, 1)}
         </span>
         {!compact && (
           <span className="workspace-label">
-            <strong>{workspace.name}</strong>
-            <small>{workspace.kind}</small>
+            <strong>{t(workspace.name)}</strong>
+            <small>{t(workspace.kind)}</small>
           </span>
         )}
         <Icon name="chevron" size={compact ? 14 : 15} />
@@ -484,15 +484,15 @@ function WorkspaceSwitcher({
                 {option.initials.slice(0, 1)}
               </span>
               <span>
-                <strong>{option.name}</strong>
-                <small>{option.kind}</small>
+                <strong>{t(option.name)}</strong>
+                <small>{t(option.kind)}</small>
               </span>
               {option.id === workspace.id && <span className="selected-dot" />}
             </button>
           ))}
           {!compact && (
             <button className="workspace-menu-footer" onClick={onCreate}>
-              <Icon name="plus" size={15} /> Create workspace
+              <Icon name="plus" size={15} /> {t("Create workspace")}
             </button>
           )}
         </div>
@@ -508,6 +508,7 @@ function WorkspaceDialog({
   onClose: () => void;
   onCreate: (name: string, kind: Workspace["kind"]) => void;
 }) {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [kind, setKind] = useState<Workspace["kind"]>("Team workspace");
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -530,40 +531,40 @@ function WorkspaceDialog({
       >
         <header className="dialog-header">
           <div>
-            <p className="eyebrow">YOUR WORKSPACES</p>
-            <h2 id="workspace-dialog-title">Create a workspace</h2>
+            <p className="eyebrow">{t("YOUR WORKSPACES")}</p>
+            <h2 id="workspace-dialog-title">{t("Create a workspace")}</h2>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="Close">
+          <button className="icon-button" onClick={onClose} aria-label={t("Close")}>
             <Icon name="close" size={18} />
           </button>
         </header>
         <form className="task-form" onSubmit={submit}>
           <label className="form-field">
-            <span>Workspace name</span>
+            <span>{t("Workspace name")}</span>
             <input
               autoFocus
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="e.g. Studio North"
+              placeholder={t("e.g. Studio North")}
               maxLength={80}
               required
             />
           </label>
           <label className="form-field">
-            <span>Workspace type</span>
+            <span>{t("Workspace type")}</span>
             <select
               value={kind}
               onChange={(event) =>
                 setKind(event.target.value as Workspace["kind"])
               }
             >
-              <option>Team workspace</option>
-              <option>Personal workspace</option>
+              <option value="Team workspace">{t("Team workspace")}</option>
+              <option value="Personal workspace">{t("Personal workspace")}</option>
             </select>
           </label>
           <footer className="dialog-actions">
             <span className="dialog-hint">
-              You can invite teammates after setup.
+              {t("You can invite teammates after setup.")}
             </span>
             <div>
               <button
@@ -571,10 +572,10 @@ function WorkspaceDialog({
                 className="button button-quiet"
                 onClick={onClose}
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button type="submit" className="button button-primary">
-                Create workspace
+                {t("Create workspace")}
               </button>
             </div>
           </footer>
@@ -586,6 +587,7 @@ function WorkspaceDialog({
 
 function SearchDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const { t } = useLanguage();
   const { workspaces, setWorkspaceId, setProjectId } = useWorkspace();
   const { tasks, projects } = useBoard();
   const [query, setQuery] = useState("");
@@ -620,7 +622,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
         className="search-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="Search Flowboard"
+        aria-label={t("Search Flowboard")}
       >
         <label className="search-dialog-input">
           <Icon name="search" size={18} />
@@ -628,9 +630,9 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
             autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search projects and tasks..."
+            placeholder={t("Search projects and tasks...")}
           />
-          <button onClick={onClose} aria-label="Close search">
+          <button onClick={onClose} aria-label={t("Close search")}>
             <Icon name="close" size={16} />
           </button>
         </label>
@@ -649,8 +651,8 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
                   <small>
                     {workspaces.find(
                       (workspace) => workspace.id === project.workspaceId,
-                    )?.name ?? "Workspace"}{" "}
-                    · Project
+                    )?.name ?? t("Workspace")}{" "}
+                    · {t("Project")}
                   </small>
                 </span>
                 <Icon className="search-result-arrow" name="arrow" size={15} />
@@ -668,20 +670,20 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
                   <strong>{task.title}</strong>
                   <small>
                     {projects.find((project) => project.id === task.projectId)
-                      ?.name ?? "Project"}{" "}
-                    · Task
+                      ?.name ?? t("Project")}{" "}
+                    · {t("Task")}
                   </small>
                 </span>
                 <Icon className="search-result-arrow" name="arrow" size={15} />
               </button>
             ))}
             {!projectResults.length && !taskResults.length && (
-              <p>No projects or tasks found.</p>
+              <p>{t("No projects or tasks found.")}</p>
             )}
           </div>
         )}
         {!normalized && (
-          <p className="search-hint">Search by task or project name.</p>
+          <p className="search-hint">{t("Search by task or project name.")}</p>
         )}
       </section>
     </div>
@@ -711,7 +713,6 @@ function NavLink({
     >
       <Icon name={icon} size={17} />
       <span>{label}</span>
-      {label === "Notifications" && <i className="nav-count">3</i>}
     </Link>
   );
 }

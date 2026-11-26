@@ -6,11 +6,13 @@ import { Avatar } from "@/components/app-shell";
 import { Icon } from "@/components/icons";
 import { useWorkspace } from "@/components/app-shell";
 import { useBoard } from "@/lib/board-store";
+import { useLanguage } from "@/lib/language";
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { workspace, projectId, setProjectId } = useWorkspace();
-  const { tasks, columns, projects, createProject, deleteProject } = useBoard();
+  const { tasks, columns, projects, createProject, deleteProject, initializeWorkspaceColumns } = useBoard();
   const [dialogOpen, setDialogOpen] = useState(false);
   const visible = useMemo(
     () => projects.filter((project) => project.workspaceId === workspace.id),
@@ -27,19 +29,18 @@ export default function ProjectsPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">
-            {workspace.name.toUpperCase()} <span className="eyebrow-dot" />{" "}
-            PROJECTS
+            {t(workspace.name).toUpperCase()} <span className="eyebrow-dot" /> {t("PROJECTS")}
           </p>
-          <h1>Projects</h1>
+          <h1>{t("Projects")}</h1>
           <p className="page-subtitle">
-            A clear view of what your team is moving forward.
+            {t("A clear view of what your team is moving forward.")}
           </p>
         </div>
         <button
           className="button button-primary"
           onClick={() => setDialogOpen(true)}
         >
-          <Icon name="plus" size={15} /> New project
+          <Icon name="plus" size={15} /> {t("New project")}
         </button>
       </div>
       <div className="project-cards">
@@ -71,9 +72,9 @@ export default function ProjectsPage() {
                 <button
                   className="icon-button subtle"
                   aria-label={`Delete ${project.name}`}
-                  title="Delete project"
+                  title={t("Delete project")}
                   onClick={() => {
-                    if (window.confirm(`Delete ${project.name} and its tasks?`))
+                    if (window.confirm(`${t("Delete")} ${project.name} ${t("and all its tasks?")}`))
                       deleteProject(project.id);
                   }}
                 >
@@ -89,7 +90,7 @@ export default function ProjectsPage() {
               <p>{project.description}</p>
               <div className="project-card-progress">
                 <div>
-                  <span>Progress</span>
+                  <span>{t("Progress")}</span>
                   <strong>{progress}%</strong>
                 </div>
                 <div className="progress-track">
@@ -113,7 +114,7 @@ export default function ProjectsPage() {
                   ))}
                 </div>
                 <span>
-                  {done} of {projectTasks.length} tasks complete
+                  {done} {t("of")} {projectTasks.length} {t("tasks complete")}
                 </span>
                 <button
                   onClick={() => openProject(project.id)}
@@ -132,14 +133,15 @@ export default function ProjectsPage() {
           <span>
             <Icon name="plus" size={20} />
           </span>
-          <strong>Create a project</strong>
-          <small>Start with a clear goal and a board.</small>
+          <strong>{t("Create a project")}</strong>
+          <small>{t("Start with a clear goal and a board.")}</small>
         </button>
       </div>
       {dialogOpen && (
         <ProjectDialog
           onClose={() => setDialogOpen(false)}
           onCreate={(name, description) => {
+            initializeWorkspaceColumns(workspace.id);
             const project = createProject(workspace.id, name, description);
             setDialogOpen(false);
             setProjectId(project.id);
@@ -163,6 +165,7 @@ function ProjectDialog({
   onClose: () => void;
   onCreate: (name: string, description: string) => void;
 }) {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -185,38 +188,38 @@ function ProjectDialog({
       >
         <header className="dialog-header">
           <div>
-            <p className="eyebrow">PROJECT SETUP</p>
-            <h2 id="project-dialog-title">Create a project</h2>
+            <p className="eyebrow">{t("PROJECT SETUP")}</p>
+            <h2 id="project-dialog-title">{t("Create a project")}</h2>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="Close">
+          <button className="icon-button" onClick={onClose} aria-label={t("Close")}>
             <Icon name="close" size={18} />
           </button>
         </header>
         <form className="task-form" onSubmit={submit}>
           <label className="form-field">
-            <span>Project name</span>
+            <span>{t("Project name")}</span>
             <input
               autoFocus
               maxLength={120}
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="What are you working on?"
+              placeholder={t("What are you working on?")}
               required
             />
           </label>
           <label className="form-field">
-            <span>Description</span>
+            <span>{t("Description")}</span>
             <textarea
               rows={3}
               maxLength={500}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="Add a short goal for the project."
+              placeholder={t("Add a short goal for the project.")}
             />
           </label>
           <footer className="dialog-actions">
             <span className="dialog-hint">
-              A new project board will be created.
+              {t("A new project board will be created.")}
             </span>
             <div>
               <button
@@ -224,10 +227,10 @@ function ProjectDialog({
                 className="button button-quiet"
                 onClick={onClose}
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button type="submit" className="button button-primary">
-                Create project
+                {t("Create project")}
               </button>
             </div>
           </footer>

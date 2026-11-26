@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/lib/language";
 
 type AuthMode = "sign-in" | "sign-up" | "recover" | "reset";
 
@@ -36,6 +37,7 @@ const copy: Record<
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
   const router = useRouter();
+  const { language, setLanguage, t } = useLanguage();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -138,16 +140,20 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         </span>
       </Link>
       <section className="auth-card">
+        <div className="auth-language language-switch" role="group" aria-label={t("Language")}>
+          <button type="button" aria-pressed={language === "en"} onClick={() => setLanguage("en")}>EN</button>
+          <button type="button" aria-pressed={language === "uk"} onClick={() => setLanguage("uk")}>УКР</button>
+        </div>
         <div className="auth-heading">
           <span className="auth-icon">
             <Icon name="spark" size={20} />
           </span>
-          <h1>{content.title}</h1>
-          <p>{content.subtitle}</p>
+          <h1>{t(content.title)}</h1>
+          <p>{t(content.subtitle)}</p>
         </div>
         {!supabase && (
           <div className="auth-setup-note">
-            <strong>Supabase setup needed</strong>
+            <strong>{t("Supabase setup needed")}</strong>
             <span>
               Copy <code>.env.example</code> to <code>.env.local</code>, add
               your Supabase project URL and publishable key, then restart the
@@ -157,43 +163,43 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         )}
         {notice && (
           <p className="auth-notice" role="status">
-            {notice}
+            {t(notice)}
           </p>
         )}
         {error && (
           <p className="auth-error" role="alert">
-            {error}
+            {t(error)}
           </p>
         )}
         <form className="auth-form" onSubmit={submit}>
           {mode === "sign-up" && (
             <label className="form-field">
-              <span>Your name</span>
+              <span>{t("Your name")}</span>
               <input
                 autoComplete="name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="Alex Morgan"
+                placeholder={t("Your name")}
                 required
               />
             </label>
           )}
           {mode !== "reset" && (
             <label className="form-field">
-              <span>Email address</span>
+              <span>{t("Email address")}</span>
               <input
                 type="email"
                 autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@company.com"
+                placeholder="name@example.com"
                 required
               />
             </label>
           )}
           {mode !== "recover" && (
             <label className="form-field">
-              <span>Password</span>
+              <span>{t("Password")}</span>
               <input
                 type="password"
                 autoComplete={
@@ -203,8 +209,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder={
                   mode === "sign-in"
-                    ? "Enter your password"
-                    : "At least 8 characters"
+                    ? t("Enter your password")
+                    : t("At least 8 characters")
                 }
                 minLength={8}
                 required
@@ -213,32 +219,32 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           )}
           {mode === "sign-in" && (
             <div className="auth-forgot">
-              <Link href="/forgot-password">Forgot password?</Link>
+              <Link href="/forgot-password">{t("Forgot password?")}</Link>
             </div>
           )}
           <button
             className="button button-primary auth-submit"
             disabled={busy || !supabase}
           >
-            {busy ? "Please wait…" : content.button}
+            {busy ? t("Please wait") : t(content.button)}
             <Icon name="arrow" size={15} />
           </button>
         </form>
         <div className="auth-switch">
           {mode === "sign-in" ? (
             <>
-              New to Flowboard? <Link href="/signup">Create an account</Link>
+              {t("New to Flowboard?")} <Link href="/signup">{t("Create an account")}</Link>
             </>
           ) : mode === "sign-up" ? (
             <>
-              Already have an account? <Link href="/login">Sign in</Link>
+              {t("Already have an account?")} <Link href="/login">{t("Sign in")}</Link>
             </>
           ) : (
-            <Link href="/login">Back to sign in</Link>
+            <Link href="/login">{t("Back to sign in")}</Link>
           )}
         </div>
       </section>
-      <p className="auth-footer">A calmer way to move work forward.</p>
+      <p className="auth-footer">{t("A calmer way to move work forward.")}</p>
     </main>
   );
 }
